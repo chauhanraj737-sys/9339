@@ -30,7 +30,7 @@
  }
  el('accountForm').onsubmit=async e=>{e.preventDefault();const f=e.target.elements;try{await api('create',{name:f.name.value,username:f.username.value,password:f.password.value,fos:[...f.fos.selectedOptions].map(o=>o.value),rights:{pdf:f.pdf.checked,png:f.png.checked,share:f.share.checked}});e.target.reset();await showUsers();el('accountStatus').textContent='User created.';}catch(e){report(e);}};
  function permissions(){badge.textContent=current?'Signed in: '+current.name:'';managerButton.dataset.denied=String(!admin());
-  const mapping={singlePdf:allowed('pdf'),allPdf:allowed('pdf'),singlePng:allowed('png'),allFiles:allowed('pdf')&&allowed('png'),editBackup:admin(),saveMonth:admin(),clearMonth:admin(),file:admin()};
+  const mapping={singlePdf:allowed('pdf'),allPdf:allowed('pdf'),allPdfLight:allowed('pdf'),singlePng:allowed('png'),allFiles:allowed('pdf')&&allowed('png'),editBackup:admin(),saveMonth:admin(),clearMonth:admin(),file:admin()};
   for(const [id,ok] of Object.entries(mapping)){const e=el(id);if(e)e.dataset.denied=String(!ok);}
   document.querySelector('label[for="file"]').dataset.denied=String(!admin());document.querySelectorAll('.edit-row').forEach(b=>b.dataset.denied=String(!admin()));
   document.querySelectorAll('[data-share]').forEach(b=>b.dataset.denied=String(!allowed('share')||!allowed(b.dataset.share)));
