@@ -1,6 +1,6 @@
 // Only confirmed server responses become dashboard state. No browser storage is read or written.
 class CloudDashboard {
- constructor({fetcher=fetch,apply,canWrite,onUnauthorized}) {
+ constructor({fetcher=(...args)=>fetch(...args),apply,canWrite,onUnauthorized}) {
   Object.assign(this,{fetcher,apply,canWrite,onUnauthorized});
   this.busy=false;this.ready=false;this.revision=0;this.generation=0;this.confirmed=null;
  }

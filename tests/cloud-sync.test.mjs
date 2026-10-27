@@ -6,6 +6,30 @@ const window={};
 runInNewContext(await readFile('cloud-sync.js','utf8'),{window,fetch:()=>{},Error});
 const CloudDashboard=window.CloudDashboard;
 
+test('default fetcher loads and saves without using the dashboard as the fetch receiver',async()=>{
+ const requests=[],applied=[],browser={};
+ runInNewContext(await readFile('cloud-sync.js','utf8'),{
+  window:browser,
+  fetch:function(url,options){
+   // Native browser fetch rejects a CloudDashboard receiver.
+   assert.equal(this,undefined);
+   requests.push({url,...options});
+   return Promise.resolve(Response.json({data:[],month:'2026-10',revision:requests.length}));
+  }
+ });
+ const cloud=new browser.CloudDashboard({canWrite:()=>true,onUnauthorized:()=>assert.fail('unexpected session expiry'),apply:r=>applied.push(r)});
+ await cloud.load();
+ await cloud.save({data:[],month:'2026-10'});
+ assert.equal(applied.length,2);
+ assert.deepEqual(requests.map(r=>r.method),['GET','POST']);
+ for(const request of requests){
+  assert.equal(request.url,'/.netlify/functions/sync');
+  assert.equal(request.credentials,'same-origin');
+  assert.equal(request.cache,'no-store');
+ }
+ assert.equal(JSON.parse(requests[1].body).revision,1);
+});
+
 test('cloud writes await confirmation and never apply failed or offline changes',async()=>{
  const requests=[],applied=[];let reply,resolve;
  const cloud=new CloudDashboard({canWrite:()=>true,onUnauthorized:()=>{},apply:r=>applied.push(r),fetcher:async(url,options)=>{requests.push({url,...options});return reply;}});
