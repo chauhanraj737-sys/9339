@@ -1,20 +1,37 @@
 import { session, sameOrigin, json } from '../lib/auth.mjs';
-import { getStore } from "@netlify/blobs";
+import { getStore } from '@netlify/blobs';
 
-export default async (request) => {
-  const user = await session(request);
-  if (!user) return json({error:'Sign in required'},401);
-  if (request.method !== 'GET' && (user.role !== 'Admin' || !sameOrigin(request))) return json({error:'Administrator access required'},403);
-  const store = getStore("retailer-dashboard");
-  if (request.method === "GET") {
-    const saved = await store.get("current", { type: "json" });
-    return new Response(JSON.stringify(saved ? {...saved,data:user.fos.length?saved.data.filter(r=>user.fos.includes(r.fos||'Unassigned')):saved.data} : {}), { headers: { "content-type": "application/json" } });
+const validMonth = value => typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+function view(saved, user) {
+  const {history, ...current} = saved;
+  return {...current, data:user.fos.length ? current.data.filter(r=>user.fos.includes(r.fos||'Unassigned')) : current.data};
+}
+export default async request => {
+ try {
+  const user=await session(request);
+  if(!user)return json({error:'Sign in required'},401);
+  if(!['GET','POST'].includes(request.method))return json({error:'Method not allowed'},405);
+  if(request.method==='POST'&&(user.role!=='Admin'||!sameOrigin(request)))return json({error:'Administrator access required'},403);
+  // Changes must be visible immediately to other devices after a successful save.
+  const store=getStore({name:'retailer-dashboard',consistency:'strong'});
+  const saved=await store.get('current',{type:'json'})||{data:[],source:'No cloud upload',month:'',revision:0};
+  if(request.method==='GET')return json(view(saved,user));
+  const body=await request.json(),action=body.action||'save';
+  if(!['save','clear','select'].includes(action)||!validMonth(body.month))return json({error:'Invalid action or report month'},400);
+  if(body.revision!==undefined&&body.revision!==(saved.revision||0))return json({error:'The cloud report changed on another device. Reload and try again.'},409);
+  const history={...saved.history};
+  if(validMonth(saved.month)&&!Object.hasOwn(history,saved.month))history[saved.month]={data:saved.data,source:saved.source};
+  let report;
+  if(action==='save') {
+   if(!Array.isArray(body.data)||body.data.some(r=>!r||typeof r!=='object'||Array.isArray(r)))return json({error:'Invalid retailer data'},400);
+   report={data:body.data,source:typeof body.source==='string'?body.source:''};
+   history[body.month]=report;
+  } else {
+   if(action==='clear')delete history[body.month];
+   report=history[body.month]||{data:[],source:'No upload for '+body.month};
   }
-  if (request.method === "POST") {
-    const body = await request.json();
-    if (!Array.isArray(body.data)) return new Response("Invalid data", { status: 400 });
-    await store.setJSON("current", { data: body.data, source: body.source || "", month: body.month || "" });
-    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
-  }
-  return new Response("Method not allowed", { status: 405 });
+  const next={...report,month:body.month,history,revision:(saved.revision||0)+1};
+  await store.setJSON('current',next);
+  return json(view(next,user));
+ } catch {return json({error:'Cloud storage is unavailable. Changes were not confirmed; please retry.'},503);}
 };
