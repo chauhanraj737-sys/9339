@@ -1,0 +1,1 @@
+export default {"id": "admin", "username": "yusuf", "name": "Administrator", "role": "Admin", "fos": [], "rights": {}, "salt": "e3e7012729529b238d4b94affbdd1632", "hash": "24985e251b84b776fc9a5751ad7e09bf7eed12f1107da206a58a410dc82b7b155f8da39428b4adec609bfae574ed3e4859578b5c218b8f584182edabd58e136d"};

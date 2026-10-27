@@ -1,2 +1,15 @@
+[build]
+  publish = "public"
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
+[[headers]]
+  for = "/auth-client.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"
