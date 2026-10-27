@@ -1,5 +1,5 @@
 (() => {
- let current=null,last='',loading=false,ready=false;
+ let current=null,last='',ready=false;
  const el=id=>document.getElementById(id);
  const admin=()=>current?.role==='Admin';
  const allowed=right=>!!current&&(admin()||current.rights[right]===true);
@@ -7,7 +7,7 @@
   const r=await fetch('/.netlify/functions/auth',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})});
   const j=await r.json();if(!r.ok){if(r.status===401)lock();throw Error(j.error||'Request failed');}return j;
  }
- function lock(){current=null;ready=false;last='';data.splice(0,data.length);chosen=-1;render();document.body.classList.add('auth-locked');el('loginGate').style.display='grid';panel.hidden=true;el('loginPass').value='';}
+ function lock(){current=null;ready=false;cloud.reset();last='';data.splice(0,data.length);chosen=-1;render();document.body.classList.add('auth-locked');el('loginGate').style.display='grid';panel.hidden=true;el('loginPass').value='';permissions();}
  const style=document.createElement('style');style.textContent='[data-denied="true"]{display:none!important}#userAccess{padding:20px;background:white;border:1px solid #dfe7f1;border-radius:14px;margin-bottom:16px}#userAccess form{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}#userAccess label{display:grid;gap:6px}#userAccess input,#userAccess select{padding:8px;border:1px solid #ccd7e4;border-radius:6px}#userAccess .account{padding:12px;border-top:1px solid #ddd;display:flex;gap:12px;align-items:center;flex-wrap:wrap}';document.head.append(style);
  const actions=document.querySelector('.actions');
  const badge=document.createElement('span');actions.prepend(badge);
@@ -40,13 +40,17 @@
  const originalEditor=openEditor;openEditor=function(i){if(admin())originalEditor(i);};
  // Capture events before the dashboard's existing handlers run, including newly rendered row actions.
  document.addEventListener('click',e=>{const b=e.target.closest('button,label');if(b?.dataset.denied==='true'){e.preventDefault();e.stopImmediatePropagation();}},true);
+ document.addEventListener('change',e=>{if(['file','month'].includes(e.target.id)&&!admin()){e.preventDefault();e.stopImmediatePropagation();}},true);
  document.addEventListener('submit',e=>{if(e.target.id==='editForm'&&!admin()){e.preventDefault();e.stopImmediatePropagation();}},true);
  for(const [id,right] of Object.entries({singlePdf:'pdf',allPdf:'pdf',singlePng:'png',allFiles:'pdf'})){const b=el(id),original=b.onclick;b.onclick=async e=>{try{await api('authorize',{right});if(id==='allFiles')await api('authorize',{right:'png'});await original(e);}catch(err){report(err);}};}
  for(const type of ['pdf','png']){const b=button('WhatsApp '+type.toUpperCase(),async()=>{try{await api('authorize',{right:'share'});await api('authorize',{right:type});if(chosen<0)return msg('Select one retailer first.',true);const r=data[chosen],blob=await(type==='pdf'?pdf(r):png(r)),name=safe(r.name)+'_'+safe(monthName())+'.'+type,file=new File([blob],name,{type:blob.type}),text='Mobile World Dahod report for '+r.name+' - '+monthName();if(navigator.canShare?.({files:[file]})){await navigator.share({files:[file],text,title:name});}else{dl(blob,name);window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener');msg('Attach the downloaded report in WhatsApp.');}}catch(e){if(e.name!=='AbortError')report(e);}});b.dataset.share=type;}
- async function loadCloud(){if(loading||!current)return;loading=true;try{const r=await fetch('/.netlify/functions/sync',{cache:'no-store'});if(r.status===401){lock();return;}if(!r.ok)throw Error('Could not load shared dashboard.');const j=await r.json();if(Array.isArray(j.data)){const incoming=JSON.stringify(j.data);if(incoming!==last||!ready){data.splice(0,data.length,...j.data);source=j.source||source;if(j.month)el('month').value=j.month;chosen=-1;render();}last=incoming;}else last=JSON.stringify(data);ready=true;}finally{loading=false;}}
+ const cloud=window.dashboardCloud=new CloudDashboard({
+  canWrite:()=>admin(),onUnauthorized:lock,
+  apply:j=>{const incoming=JSON.stringify(j);if(incoming!==last||!ready||el('month').value!==(j.month||new Date().toISOString().slice(0,7))){data.splice(0,data.length,...j.data);source=j.source||'No cloud upload';el('month').value=j.month||new Date().toISOString().slice(0,7);chosen=-1;el('editBackup').disabled=!data.length;render();}last=incoming;ready=true;}
+ });
+ async function loadCloud(){if(current)await cloud.load();}
  async function enter(u){current=u;ready=false;if(!admin()){data.splice(0,data.length);chosen=-1;render();}await loadCloud();if(!current)return;document.body.classList.remove('auth-locked');el('loginGate').style.display='none';el('loginPass').value='';permissions();}
  el('loginForm').onsubmit=async e=>{e.preventDefault();el('loginError').textContent='';const b=e.target.querySelector('button');b.disabled=true;try{const j=await api('login',{username:el('loginUser').value,password:el('loginPass').value});await enter(j.user);}catch(err){el('loginError').textContent=err.message;}finally{b.disabled=false;}};
- setInterval(async()=>{if(!current||loading||!ready)return;try{const r=await fetch('/.netlify/functions/auth',{cache:'no-store'});if(!r.ok){if(r.status===401)lock();return;}current=(await r.json()).user;permissions();const now=JSON.stringify(data);if(admin()&&(now!==last||source!==lastSource||el('month').value!==lastMonth)){loading=true;try{const r=await fetch('/.netlify/functions/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({data,source,month:el('month').value})});if(!r.ok)throw Error('Shared changes could not be saved.');last=now;lastSource=source;lastMonth=el('month').value;}finally{loading=false;}}else await loadCloud();}catch(e){report(e);}},2500);
- let lastSource=source,lastMonth=el('month').value;
+ setInterval(async()=>{if(!current||cloud.busy||!ready||el('editDialog').open)return;try{const r=await fetch('/.netlify/functions/auth',{cache:'no-store'});if(!r.ok){if(r.status===401)lock();return;}current=(await r.json()).user;permissions();await loadCloud();}catch(e){report(e);}},2500);
  permissions();fetch('/.netlify/functions/auth',{cache:'no-store'}).then(async r=>{if(r.ok)await enter((await r.json()).user);}).catch(e=>{el('loginError').textContent=e.message;});
 })();

@@ -4,7 +4,7 @@
   },
   "private": true,
   "scripts": {
-    "test": "node --test --experimental-loader ./tests/blob-loader.mjs tests/auth.test.mjs",
+    "test": "node --test --experimental-loader ./tests/blob-loader.mjs tests/*.test.mjs",
     "prepare-site": "node scripts/prepare-site.mjs"
   }
 }

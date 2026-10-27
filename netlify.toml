@@ -1,4 +1,5 @@
 [build]
+  command = "npm run prepare-site"
   publish = "public"
 [functions]
   directory = "netlify/functions"
