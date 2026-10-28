@@ -56,7 +56,7 @@
   canWrite:()=>admin(),onUnauthorized:lock,
   apply:j=>{const incoming=JSON.stringify(j),months=Array.isArray(j.availableMonths)?j.availableMonths:[];historyPicker.replaceChildren(new Option('Backend month history',''));for(const month of months)historyPicker.add(new Option(month,month));historyPicker.value=months.includes(j.month)?j.month:'';historyPicker.hidden=admin()||!months.length;if(incoming!==last||!ready||el('month').value!==(j.month||new Date().toISOString().slice(0,7))){data.splice(0,data.length,...j.data);source=j.source||'No cloud upload';el('month').value=j.month||new Date().toISOString().slice(0,7);chosen=-1;el('editBackup').disabled=!data.length;render();}last=incoming;ready=true;}
  });
- async function loadCloud(){if(current)await cloud.load();}
+ async function loadCloud(){if(current)await cloud.load(admin()?undefined:el('month').value);}
  async function enter(u){current=u;ready=false;if(!admin()){data.splice(0,data.length);chosen=-1;render();}await loadCloud();if(!current)return;document.body.classList.remove('auth-locked');el('loginGate').style.display='none';el('loginPass').value='';permissions();}
  el('loginForm').onsubmit=async e=>{e.preventDefault();el('loginError').textContent='';const b=e.target.querySelector('button');b.disabled=true;try{const j=await api('login',{username:el('loginUser').value,password:el('loginPass').value});await enter(j.user);}catch(err){el('loginError').textContent=err.message;}finally{b.disabled=false;}};
  setInterval(async()=>{if(!current||cloud.busy||!ready||el('editDialog').open)return;try{const r=await fetch('/.netlify/functions/auth',{cache:'no-store'});if(!r.ok){if(r.status===401)lock();return;}current=(await r.json()).user;permissions();await loadCloud();}catch(e){report(e);}},2500);
