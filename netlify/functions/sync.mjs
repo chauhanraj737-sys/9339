@@ -8,7 +8,8 @@ function view(saved, user, requestedMonth=saved.month) {
   const month=validMonth(requestedMonth)?requestedMonth:(validMonth(saved.month)?saved.month:'');
   const report=month===saved.month?saved:(history[month]||{data:[],source:'No upload for '+month});
   const data=Array.isArray(report.data)?report.data:[];
-  return {...report,month,revision:saved.revision||0,availableMonths,data:user.fos.length?data.filter(r=>user.fos.includes(r.fos||'Unassigned')):data};
+  const {history:_history,...current}=report;
+  return {...current,month,revision:saved.revision||0,availableMonths,data:user.fos.length?data.filter(r=>user.fos.includes(r.fos||'Unassigned')):data};
 }
 export default async request => {
  try {
