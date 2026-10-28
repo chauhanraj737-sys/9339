@@ -32,7 +32,7 @@ export default async (req,context) => {
    const account=await db.get('users/'+user.username,{type:'json'});
    const currentPassword=String(body.currentPassword||''),newPassword=String(body.newPassword||'');
    if(!account||!verify(currentPassword,account))return json({error:'Current password is incorrect'},403);
-   if(newPassword.length<8||newPassword.length>256)return json({error:'New password must contain 8 to 256 characters'},400);
+   if(newPassword.length<4||newPassword.length>256)return json({error:'New password must contain 4 to 256 characters'},400);
    await db.setJSON('users/'+user.username,{...account,...hash(newPassword)});
    const t=token(req);await revokeSessions(db,user.username,t?'sessions/'+digest(t):'');
    return json({ok:true});
@@ -46,7 +46,7 @@ export default async (req,context) => {
   if(action==='reset-password') {
    if(!existing||existing.role==='Admin')return json({error:'User account not found'},404);
    const password=String(body.password||'');
-   if(password.length<8||password.length>256)return json({error:'Password must contain 8 to 256 characters'},400);
+   if(password.length<4||password.length>256)return json({error:'Password must contain 4 to 256 characters'},400);
    await db.setJSON(key,{...existing,...hash(password)});await revokeSessions(db,username);
    return json({ok:true});
   }
